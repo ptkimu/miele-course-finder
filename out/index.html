@@ -115,8 +115,8 @@
 
 <div class="app">
   <header class="hd">
-    <h1>MIELE COURSE FINDER<em id="hdStep">質問 1 / 3</em></h1>
-    <div class="bar" id="bar"><i class="on"></i><i></i><i></i></div>
+    <h1>MIELE COURSE FINDER<em id="hdStep">質問 1 / 4</em></h1>
+    <div class="bar" id="bar"><i class="on"></i><i></i><i></i><i></i></div>
   </header>
   <main id="main"></main>
 </div>
@@ -138,24 +138,32 @@
 var LIFF_ID = 'xxxxxxxxxx-xxxxxxxx';   // ← 発行された LIFF ID に差し替え
 
 /* ---------- 選択肢マスタ ---------- */
+/* コース側の sex: 'f'=女性限定 / 'm'=男性限定 / 未指定=どちらでも */
+var GENDERS = [
+  {id:'f', label:'女性', em:'👩'},
+  {id:'m', label:'男性', em:'👨'}
+];
+/* 女性限定の項目（sex:'f'）は末尾に置く。男性のとき2つ消えても
+   「セルフ脱毛／セラピスト脱毛」が同じ行に並ぶよう並び順を固定している */
 var CONCERNS = [
   {id:'pore',  label:'毛穴・シミ・くすみ', em:'✨'},
   {id:'acne',  label:'ニキビ・肌荒れ',     em:'🌿'},
   {id:'lift',  label:'たるみ・小顔',       em:'🪞'},
   {id:'belly', label:'お腹・太ももの脂肪', em:'🎯'},
   {id:'arm',   label:'二の腕・脚のライン', em:'💧'},
-  {id:'hair',  label:'ムダ毛・VIO脱毛',    em:'🪶'},
-  {id:'mens',  label:'メンズ脱毛・ヒゲ',   em:'🧔'},
   {id:'relax', label:'疲れ・肩こり・むくみ', em:'🌙'},
-  {id:'post',  label:'産後の体型戻し',     em:'🍼'},
-  {id:'bridal',label:'結婚式・イベント前', em:'💍'}
+  {id:'self',  label:'セルフ脱毛',         em:'🪶', sub:'ご自身で照射／低価格'},
+  {id:'thera', label:'セラピスト脱毛',     em:'🧔', sub:'スタッフにおまかせ'},
+  {id:'post',  label:'産後の体型戻し',     em:'🍼', sex:'f'},
+  {id:'bridal',label:'結婚式・イベント前', em:'💍', sex:'f'}
 ];
+/* cap = ご予算の上限額。この金額を超えるコースは候補に出さない */
 var BUDGETS = [
-  {id:'b1', tier:1, label:'〜5,000円',        sub:'まずは気軽に試したい'},
-  {id:'b2', tier:2, label:'5,000〜10,000円',  sub:'続けやすい価格帯'},
-  {id:'b3', tier:3, label:'10,000〜15,000円', sub:'しっかりケアしたい'},
-  {id:'b4', tier:4, label:'15,000円以上',     sub:'結果を最優先したい'},
-  {id:'any',tier:0, label:'こだわらない',      sub:'内容で選びたい'}
+  {id:'b1', tier:1, cap:5000,    label:'〜5,000円',        sub:'まずは気軽に試したい'},
+  {id:'b2', tier:2, cap:10000,   label:'5,000〜10,000円',  sub:'続けやすい価格帯'},
+  {id:'b3', tier:3, cap:15000,   label:'10,000〜15,000円', sub:'しっかりケアしたい'},
+  {id:'b4', tier:4, cap:Infinity,label:'15,000円以上',     sub:'結果を最優先したい'},
+  {id:'any',tier:0, cap:Infinity,label:'こだわらない',      sub:'内容で選びたい'}
 ];
 var PACES = [
   {id:'trial',     label:'まずは1回体験したい',     sub:'初回体験・お試しメニュー'},
@@ -185,10 +193,10 @@ var COURSES = [
   {name:'プラズマ × 光フェイシャル', price:8800, min:null, cat:'フェイシャル', badge:'期間限定',
    concerns:['pore','acne'], paces:['monthly','intensive'],
    desc:'プラズマシャワー後にミルキー光フェイシャル。毛穴とシミをまとめてケアします。'},
-  {name:'次世代 光フェイシャル 30分', price:5390, min:30, cat:'フェイシャル', badge:'',
+  {name:'ミルキーフェイシャル 30分', price:3300, reg:5390, min:30, cat:'フェイシャル', badge:'新規限定',
    concerns:['pore'], paces:['quick','trial','monthly'],
    desc:'光フェイシャル＋保湿パックを30分で。すきま時間に肌のトーンを整えたい方へ。'},
-  {name:'韓国肌管理 ララピール', price:11000, min:null, cat:'韓国肌管理', badge:'',
+  {name:'韓国肌管理 ララピール', price:8800, reg:11000, min:null, cat:'韓国肌管理', badge:'新規限定',
    concerns:['pore','bridal'], paces:['monthly','intensive'],
    desc:'第4世代ピーリング。ごわつきをリセットし、なめらかな肌質へ導きます。'},
   {name:'エステ版ポテンツァ リジュラン導入', price:16800, min:null, cat:'韓国肌管理', badge:'',
@@ -207,7 +215,7 @@ var COURSES = [
   {name:'サーマエッジ 全顔ショット 時間内打ち放題', price:16000, min:null, cat:'小顔', badge:'',
    concerns:['lift','bridal'], paces:['intensive'],
    desc:'顔全体を時間内打ち放題。しっかり結果を出したい方向けのハイグレードコースです。'},
-  {name:'結婚式向け 花嫁フェイシャル集中コース', price:14300, min:90, cat:'ブライダル', badge:'新規限定',
+  {name:'結婚式向け 花嫁フェイシャル集中コース', price:14300, min:90, cat:'ブライダル', badge:'新規限定', sex:'f',
    concerns:['bridal','pore','lift'], paces:['intensive'],
    desc:'ララピール→光フェイシャル→高浸透パックの90分。式当日のベストコンディションへ。'},
   /* --- 痩身・ボディ --- */
@@ -238,7 +246,7 @@ var COURSES = [
   {name:'脂肪冷却 4カップ 痩身コース', price:20900, min:null, cat:'痩身', badge:'期間限定',
    concerns:['belly','arm','post'], paces:['intensive'],
    desc:'脂肪冷却4カップ＋ラジオ波で2箇所同時施術。短期で変化を出したい方へ。'},
-  {name:'産後ダイエット向け マシン3種コース', price:16100, min:null, cat:'痩身', badge:'新規限定',
+  {name:'産後ダイエット向け マシン3種コース', price:16100, min:null, cat:'痩身', badge:'新規限定', sex:'f',
    concerns:['post','belly'], paces:['intensive'],
    desc:'脂肪冷却・電磁パルス・ラジオ波の3種で、産後の気になる脂肪をケアします。'},
   /* --- リラクゼーション --- */
@@ -253,36 +261,39 @@ var COURSES = [
    desc:'アロマトリートメント＋もも・ふくらはぎのリンパマッサージでむくみもケア。'},
   /* --- 脱毛 --- */
   {name:'痛みが少ないLED脱毛 初回体験', price:2200, min:20, cat:'脱毛', badge:'新規限定',
-   concerns:['hair'], paces:['trial','quick'],
+   concerns:['thera'], paces:['trial','quick'],
    desc:'1部位20分。痛みが少ないLED脱毛を、まずは初回体験価格でお試しいただけます。'},
-  {name:'【女性限定】VIO脱毛 30分', price:4950, min:30, cat:'脱毛', badge:'新規限定',
-   concerns:['hair'], paces:['trial','quick','intensive'],
+  {name:'【女性限定】VIO脱毛 30分', price:4950, min:30, cat:'脱毛', badge:'新規限定', sex:'f',
+   concerns:['thera'], paces:['trial','quick','intensive'],
    desc:'セラピストによるVIO脱毛30分。デリケートゾーンもお任せください。'},
-  {name:'セラピスト脱毛 30分', price:6600, camp:4950, min:30, cat:'脱毛', badge:'',
-   concerns:['hair','mens'], paces:['monthly','quick','intensive'],
+  {name:'セラピスト脱毛 30分', price:4950, reg:6600, min:30, cat:'脱毛', badge:'新規限定',
+   concerns:['thera'], paces:['monthly','quick','intensive'],
    desc:'LED脱毛30分の打ち放題。気になる部位を時間内で自由にお手入れできます。'},
-  {name:'セルフ脱毛 30分', price:4950, camp:3300, min:30, cat:'脱毛', badge:'',
-   concerns:['hair','mens'], paces:['quick','trial','monthly'],
+  {name:'セルフ脱毛 30分', price:3300, reg:4950, min:30, cat:'脱毛', badge:'新規限定',
+   concerns:['self'], paces:['quick','trial','monthly'],
    desc:'時間内でご自身でお手入れ。費用を抑えながら、気になる部位をこまめにケアできます。'},
-  {name:'セラピスト脱毛 60分', price:9900, min:60, cat:'脱毛', badge:'キャンペーン価格',
-   concerns:['hair','mens'], paces:['intensive','monthly'],
+  {name:'セラピスト脱毛 60分', price:9900, min:60, cat:'脱毛', badge:'新規限定',
+   concerns:['thera'], paces:['intensive','monthly'],
    desc:'60分たっぷり打ち放題。複数部位をまとめてお手入れしたい方におすすめです。'},
-  {name:'セルフ脱毛 60分', price:6600, min:60, cat:'脱毛', badge:'キャンペーン価格',
-   concerns:['hair','mens'], paces:['monthly','intensive'],
-   desc:'60分のセルフ脱毛。広い範囲をご自身のペースでお手入れいただけます。'},
-  {name:'セラピスト全身脱毛（顔・VIO無し）', price:9900, min:null, cat:'脱毛', badge:'キャンペーン価格',
-   concerns:['hair'], paces:['intensive','monthly'],
+  {name:'セルフ脱毛 60分（全身OK）', price:6600, reg:9900, min:60, cat:'脱毛', badge:'新規限定',
+   concerns:['self'], paces:['monthly','intensive'],
+   desc:'60分のセルフ脱毛。全身をまるごと、ご自身のペースでお手入れいただけます。'},
+  {name:'セラピスト全身脱毛（顔・VIO無し）', price:9900, reg:13200, min:null, cat:'脱毛', badge:'新規限定',
+   concerns:['thera'], paces:['intensive','monthly'],
    desc:'全身をまとめてお手入れ。計画的に通いたい方に選ばれているプランです。'},
-  {name:'メンズ髭脱毛 LED脱毛 初回体験', price:2200, min:20, cat:'メンズ', badge:'新規限定',
-   concerns:['mens'], paces:['trial','quick'],
+  {name:'セラピスト全身脱毛（顔・VIOあり）90分', price:14850, min:90, cat:'脱毛', badge:'新規限定',
+   concerns:['thera','bridal'], paces:['intensive'],
+   desc:'顔・VIOまで含めた90分の全身脱毛。まるごとお手入れしたい方の決定版プランです。'},
+  {name:'メンズ髭脱毛 LED脱毛 初回体験', price:2200, min:20, cat:'メンズ', badge:'新規限定', sex:'m',
+   concerns:['thera'], paces:['trial','quick'],
    desc:'痛みが少ないLED脱毛でヒゲを。毎日の髭剃り負担を減らしたい方へ。'},
-  {name:'体毛が濃いメンズへ LED脱毛 初回体験', price:2200, min:20, cat:'メンズ', badge:'新規限定',
-   concerns:['mens','hair'], paces:['trial','quick'],
+  {name:'体毛が濃いメンズへ LED脱毛 初回体験', price:2200, min:20, cat:'メンズ', badge:'新規限定', sex:'m',
+   concerns:['thera'], paces:['trial','quick'],
    desc:'1部位20分以内。体毛の濃さが気になる男性の初回体験メニューです。'}
 ];
 
 /* ---------- 状態 ---------- */
-var state = {step:1, concerns:[], budget:null, pace:null};
+var state = {step:1, gender:null, concerns:[], budget:null, pace:null};
 var main  = document.getElementById('main');
 function label(arr,id){ for(var i=0;i<arr.length;i++){ if(arr[i].id===id) return arr[i].label; } return ''; }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -291,9 +302,9 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
    マッチングロジック（条件フィルタリング型）
    お悩み一致 +2 / 予算ぴったり +3・隣の価格帯 +1 / 通い方一致 +3
    ===================================================================== */
-/* 実際にお支払いいただく金額（キャンペーン価格があればそちら）で価格帯を判定 */
-function payPrice(c){ return c.camp || c.price; }
-function tierOf(price){ return price<=5500 ? 1 : price<=10000 ? 2 : price<=15000 ? 3 : 4; }
+/* price は常に新規（初回）価格。reg があれば 2回目以降の通常価格 */
+function payPrice(c){ return c.price; }
+function tierOf(price){ return price<=5000 ? 1 : price<=10000 ? 2 : price<=15000 ? 3 : 4; }
 
 function scoreCourse(c){
   var hits = [], score = 0, i;
@@ -324,13 +335,39 @@ function scoreCourse(c){
   return {course:c, score:score, hits:hits, rate:Math.round(score/max*100), matched:matched.length};
 }
 
+/* 性別で対象外のもの（女性限定／男性限定）は除外する。コースにも質問項目にも使う */
+function forGender(c){ return !c.sex || c.sex === state.gender; }
+
+/* 選ばれたご予算の上限額 */
+function budgetCap(){
+  for(var i=0;i<BUDGETS.length;i++){ if(BUDGETS[i].id === state.budget) return BUDGETS[i].cap; }
+  return Infinity;
+}
+
+/* ご予算内に候補が無く、価格の近いコースを代わりに出したときだけ true */
+var overBudget = false;
+
 function getResults(){
-  var ranked = COURSES.map(scoreCourse).sort(function(a,b){
+  var cap = budgetCap();
+  var ranked = COURSES.filter(forGender).map(scoreCourse).sort(function(a,b){
     return (b.score - a.score) || (payPrice(a.course) - payPrice(b.course));
   });
   // 悩みが1つも一致しないコースは出さない（条件フィルタリングの筋を通す）
-  var hit = ranked.filter(function(r){ return r.matched > 0; }).slice(0,3);
-  return hit.length ? hit : ranked.slice(0,2);
+  var hit = ranked.filter(function(r){ return r.matched > 0; });
+
+  // ご予算は上限として扱う。超える金額のコースは出さない
+  var within = hit.filter(function(r){ return payPrice(r.course) <= cap; });
+  overBudget = false;
+  if(within.length) return within.slice(0,3);
+
+  // ご予算内に該当が無い場合のみ、条件に合う中で安い順に2件をご案内する
+  if(hit.length){
+    overBudget = true;
+    return hit.slice().sort(function(a,b){
+      return payPrice(a.course) - payPrice(b.course);
+    }).slice(0,2);
+  }
+  return ranked.slice(0,2);
 }
 
 /* =====================================================================
@@ -360,14 +397,15 @@ function buildMessage(course){
   var lines = [
     '【コース診断からのご相談】',
     '',
-    '■ お悩み：' + state.concerns.map(function(id){ return label(CONCERNS,id); }).join('、'),
+    '■ お客様：' + label(GENDERS,state.gender),
+    '■ お悩み・ご希望：' + state.concerns.map(function(id){ return label(CONCERNS,id); }).join('、'),
     '■ ご予算：' + label(BUDGETS,state.budget),
     '■ 通い方：' + label(PACES,state.pace),
     '',
     '■ 気になるコース：'
   ];
   function line(c){
-    return '・' + c.name + '（¥' + payPrice(c).toLocaleString() + (c.camp ? '／キャンペーン価格' : '') + '）';
+    return '・' + c.name + '（¥' + payPrice(c).toLocaleString() + '／新規価格' + '）';
   }
   if(course){
     lines.push(line(course));
@@ -412,26 +450,56 @@ function optionHTML(o, selected){
 }
 
 function render(){
-  var bar = [1,2,3].map(function(n){ return '<i class="' + (state.step>=n?'on':'') + '"></i>'; }).join('');
+  var bar = [1,2,3,4].map(function(n){ return '<i class="' + (state.step>=n?'on':'') + '"></i>'; }).join('');
   document.getElementById('bar').innerHTML = bar;
-  document.getElementById('hdStep').textContent = state.step<=3 ? '質問 ' + state.step + ' / 3' : '診断結果';
+  document.getElementById('hdStep').textContent = state.step<=4 ? '質問 ' + state.step + ' / 4' : '診断結果';
   window.scrollTo(0,0);
   if(state.step===1) return renderStep1();
   if(state.step===2) return renderStep2();
   if(state.step===3) return renderStep3();
+  if(state.step===4) return renderStep4();
   renderResult();
 }
 
+/* 質問1：性別（対象が分かれるメニューの出し分けに使用） */
 function renderStep1(){
   var hello = liffProfile ? esc(liffProfile.displayName) + 'さん、' : '';
   main.className = 'fade';
   main.innerHTML =
-      '<h2 class="q">' + hello + 'いま気になる<br>お悩みを教えてください</h2>'
-    + '<p class="qs">あてはまるものをすべて選択（複数可）</p>'
+      '<h2 class="q">' + hello + 'はじめに、<br>お客様について教えてください</h2>'
+    + '<p class="qs">対象が分かれるメニューを正しくご案内するために伺っています</p>'
     + '<div class="opts two" id="opts">'
-    + CONCERNS.map(function(o){ return optionHTML(o, state.concerns.indexOf(o.id)>=0); }).join('')
+    + GENDERS.map(function(o){ return optionHTML(o, state.gender===o.id); }).join('')
+    + '</div><div class="nav">'
+    + '<button class="btn" id="next"' + (state.gender?'':' disabled') + '>次へ進む</button></div>';
+
+  var next = document.getElementById('next');
+  document.getElementById('opts').addEventListener('click', function(e){
+    var b = e.target.closest('.opt'); if(!b) return;
+    state.gender = b.dataset.id;
+    // 性別を選び直したとき、対象外になった項目（産後・結婚式など）は選択から外す
+    state.concerns = state.concerns.filter(function(id){
+      for(var j=0;j<CONCERNS.length;j++){ if(CONCERNS[j].id===id) return forGender(CONCERNS[j]); }
+      return false;
+    });
+    var all = document.querySelectorAll('.opt');
+    for(var i=0;i<all.length;i++) all[i].classList.toggle('sel', all[i] === b);
+    next.disabled = false;
+  });
+  next.onclick = function(){ state.step = 2; render(); };
+}
+
+/* 質問2：お悩み・ご希望（複数選択） */
+function renderStep2(){
+  main.className = 'fade';
+  main.innerHTML =
+      '<h2 class="q">いま気になること・<br>ご希望を教えてください</h2>'
+    + '<p class="qs">あてはまるものをすべて選択（複数可）／脱毛は「自分で照射」か「おまかせ」かでお選びください</p>'
+    + '<div class="opts two" id="opts">'
+    + CONCERNS.filter(forGender).map(function(o){ return optionHTML(o, state.concerns.indexOf(o.id)>=0); }).join('')
     + '</div><p class="cnt" id="cnt"></p>'
-    + '<div class="nav"><button class="btn" id="next" disabled>次へ進む</button></div>';
+    + '<div class="nav"><button class="back" id="back">←</button>'
+    + '<button class="btn" id="next" disabled>次へ進む</button></div>';
 
   var cnt = document.getElementById('cnt'), next = document.getElementById('next');
   function sync(){
@@ -445,15 +513,17 @@ function renderStep1(){
     b.classList.toggle('sel', i < 0);
     sync();
   });
-  next.onclick = function(){ state.step = 2; render(); };
+  document.getElementById('back').onclick = function(){ state.step = 1; render(); };
+  next.onclick = function(){ state.step = 3; render(); };
   sync();
 }
 
-function renderStep2(){
+/* 質問3：ご予算 */
+function renderStep3(){
   main.className = 'fade';
   main.innerHTML =
       '<h2 class="q">1回あたりのご予算は<br>どのくらいですか？</h2>'
-    + '<p class="qs">表示はすべて税込価格です</p>'
+    + '<p class="qs">表示はすべて税込・新規（初回）価格です</p>'
     + '<div class="opts" id="opts">'
     + BUDGETS.map(function(o){ return optionHTML(o, state.budget===o.id); }).join('')
     + '</div><div class="nav"><button class="back" id="back">←</button>'
@@ -461,7 +531,8 @@ function renderStep2(){
   bindSingle('budget');
 }
 
-function renderStep3(){
+/* 質問4：通い方 */
+function renderStep4(){
   main.className = 'fade';
   main.innerHTML =
       '<h2 class="q">どんなペースで<br>通いたいですか？</h2>'
@@ -495,11 +566,11 @@ function renderResult(){
     var c = r.course, pay = payPrice(c);
     return '<article class="card' + (i===0?' top':'') + '">'
       + '<div class="head"><span class="rank">' + (i===0 ? '★ もっとも条件に近い' : '第' + (i+1) + '候補') + '</span>'
-      + (c.badge ? '<span class="badge">' + c.badge + '</span>' : '')
-      + (c.camp ? '<span class="badge camp">キャンペーン価格</span>' : '') + '</div>'
+      + (c.badge && c.badge !== '新規限定' ? '<span class="badge">' + c.badge + '</span>' : '')
+      + '<span class="badge camp">新規価格</span></div>'
       + '<h3 class="cname">' + c.name + '</h3>'
       + '<p class="meta"><b>¥' + pay.toLocaleString() + '</b> 税込'
-      + (c.camp ? '<s>¥' + c.price.toLocaleString() + '</s>' : '')
+      + (c.reg ? '<s>¥' + c.reg.toLocaleString() + '</s>' : '')
       + (c.min ? ' ／ ' + c.min + '分' : '') + ' ／ ' + c.cat + '</p>'
       + '<div class="score"><span class="t"><i data-w="' + r.rate + '"></i></span>'
       + '<span class="v">条件一致 ' + r.rate + '%</span></div>'
@@ -511,10 +582,15 @@ function renderResult(){
 
   main.className = 'fade';
   main.innerHTML =
-      '<h2 class="q">条件に合うコースが<br>' + results.length + '件見つかりました</h2>'
-    + '<p class="qs">選ばれた条件との一致度が高い順に表示しています</p>'
+      '<h2 class="q">' + (overBudget
+        ? 'ご予算に近いコースを<br>' + results.length + '件ご案内します'
+        : '条件に合うコースが<br>' + results.length + '件見つかりました') + '</h2>'
+    + '<p class="qs">' + (overBudget
+        ? 'ご予算内に条件の合うコースがなかったため、価格の近いものを安い順にご案内しています'
+        : '選ばれた条件との一致度が高い順に表示しています') + '</p>'
     + '<dl class="sum">'
-    + '<dt>お悩み</dt><dd>' + state.concerns.map(function(id){ return label(CONCERNS,id); }).join('、') + '</dd>'
+    + '<dt>お客様</dt><dd>' + label(GENDERS,state.gender) + '</dd>'
+    + '<dt>お悩み・ご希望</dt><dd>' + state.concerns.map(function(id){ return label(CONCERNS,id); }).join('、') + '</dd>'
     + '<dt>ご予算</dt><dd>' + label(BUDGETS,state.budget) + '</dd>'
     + '<dt>通い方</dt><dd>' + label(PACES,state.pace) + '</dd></dl>'
     + cards
@@ -523,7 +599,7 @@ function renderResult(){
     + '<button class="line-btn ghost" id="askAll">' + LINE_ICON + '候補をまとめて相談する</button>'
     + '<button class="again" id="again">条件を選び直す</button>'
     + '<p class="note">ビューティサロン ミエーレ（茨城県古河市本町3-19-1 Anesisビル／古河駅 徒歩8分）<br>'
-    + 'キャンペーン価格は期間により変更・終了する場合があります。<br>'
+    + '表示は税込の新規（初回）価格です。取り消し線は2回目以降の通常価格。<br>'
     + '掲載価格・内容の最新情報はご相談時にご確認ください。<br>'
     + '<span class="env">' + envLabel + '</span></p>'
     + '</div>';
@@ -538,7 +614,7 @@ function renderResult(){
     sendToLine(b.id === 'askAll' ? null : results[Number(b.dataset.i)].course);
   });
   document.getElementById('again').onclick = function(){
-    state = {step:1, concerns:[], budget:null, pace:null};
+    state = {step:1, gender:null, concerns:[], budget:null, pace:null};
     render();
   };
 }
