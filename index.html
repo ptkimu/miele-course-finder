@@ -66,6 +66,9 @@
   .back{flex:0 0 auto;width:52px;padding:15px 0;border-radius:99px;border:1.5px solid var(--line);
         background:var(--card);color:var(--sub);font:inherit;font-size:16px;cursor:pointer}
   .cnt{text-align:center;font-size:12px;color:var(--sub);margin-top:10px;min-height:18px}
+  .hint{margin:12px 0 0;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.6;
+        background:var(--accent-soft);border:1px solid #EED9CF;color:var(--accent-deep);font-weight:600}
+  .hint[hidden]{display:none}
 
   /* 結果 */
   .sum{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:18px}
@@ -272,18 +275,19 @@ var COURSES = [
   {name:'セルフ脱毛 30分', price:3300, reg:4950, min:30, cat:'脱毛', badge:'新規限定',
    concerns:['self'], paces:['quick','trial','monthly'],
    desc:'時間内でご自身でお手入れ。費用を抑えながら、気になる部位をこまめにケアできます。'},
-  {name:'セラピスト脱毛 60分', price:9900, min:60, cat:'脱毛', badge:'新規限定',
+  {name:'セラピスト脱毛 60分（全身可）', price:9900, reg:13200, min:60, cat:'脱毛', badge:'新規限定',
    concerns:['thera'], paces:['intensive','monthly'],
-   desc:'60分たっぷり打ち放題。複数部位をまとめてお手入れしたい方におすすめです。'},
+   desc:'60分の打ち放題。全身をまとめてでも、気になる部位を重点的にでもOK。顔・VIOをご希望の方は90分コースへ。'},
   {name:'セルフ脱毛 60分（全身OK）', price:6600, reg:9900, min:60, cat:'脱毛', badge:'新規限定',
    concerns:['self'], paces:['monthly','intensive'],
    desc:'60分のセルフ脱毛。全身をまるごと、ご自身のペースでお手入れいただけます。'},
-  {name:'セラピスト全身脱毛（顔・VIO無し）', price:9900, reg:13200, min:null, cat:'脱毛', badge:'新規限定',
-   concerns:['thera'], paces:['intensive','monthly'],
-   desc:'全身をまとめてお手入れ。計画的に通いたい方に選ばれているプランです。'},
-  {name:'セラピスト全身脱毛（顔・VIOあり）90分', price:14850, min:90, cat:'脱毛', badge:'新規限定',
+  /* 90分の全身は顔・VIOの扱いが男女で異なるため2本立て（メンズVIOはセルフのため対象外） */
+  {name:'セラピスト全身脱毛（顔・VIOあり）90分', price:14850, reg:19800, min:90, cat:'脱毛', badge:'新規限定', sex:'f',
    concerns:['thera','bridal'], paces:['intensive'],
    desc:'顔・VIOまで含めた90分の全身脱毛。まるごとお手入れしたい方の決定版プランです。'},
+  {name:'セラピスト全身脱毛（顔あり・VIO無し）90分', price:14850, reg:19800, min:90, cat:'脱毛', badge:'新規限定', sex:'m',
+   concerns:['thera'], paces:['intensive'],
+   desc:'顔を含めた90分の全身脱毛。VIOはセルフ脱毛のご用意がありますのでご相談ください。'},
   {name:'メンズ髭脱毛 LED脱毛 初回体験', price:2200, min:20, cat:'メンズ', badge:'新規限定', sex:'m',
    concerns:['thera'], paces:['trial','quick'],
    desc:'痛みが少ないLED脱毛でヒゲを。毎日の髭剃り負担を減らしたい方へ。'},
@@ -347,6 +351,23 @@ function budgetCap(){
 /* ご予算内に候補が無く、価格の近いコースを代わりに出したときだけ true */
 var overBudget = false;
 
+/* ご予算「こだわらない」のときは、同じ価格帯で3枠が埋まらないよう
+   価格帯（tier）が重ならないように上位から採り、余った枠をスコア順で埋める。
+   お手頃コースだけが並んで90分などのしっかりコースが埋もれるのを防ぐ */
+function pickSpread(list, n){
+  var picked = [], seen = {}, i, t;
+  for(i=0;i<list.length && picked.length<n;i++){
+    t = tierOf(payPrice(list[i].course));
+    if(seen[t]) continue;
+    seen[t] = 1;
+    picked.push(list[i]);
+  }
+  for(i=0;i<list.length && picked.length<n;i++){
+    if(picked.indexOf(list[i]) < 0) picked.push(list[i]);
+  }
+  return picked;
+}
+
 function getResults(){
   var cap = budgetCap();
   var ranked = COURSES.filter(forGender).map(scoreCourse).sort(function(a,b){
@@ -358,7 +379,7 @@ function getResults(){
   // ご予算は上限として扱う。超える金額のコースは出さない
   var within = hit.filter(function(r){ return payPrice(r.course) <= cap; });
   overBudget = false;
-  if(within.length) return within.slice(0,3);
+  if(within.length) return state.budget === 'any' ? pickSpread(within,3) : within.slice(0,3);
 
   // ご予算内に該当が無い場合のみ、条件に合う中で安い順に2件をご案内する
   if(hit.length){
@@ -497,13 +518,20 @@ function renderStep2(){
     + '<p class="qs">あてはまるものをすべて選択（複数可）／脱毛は「自分で照射」か「おまかせ」かでお選びください</p>'
     + '<div class="opts two" id="opts">'
     + CONCERNS.filter(forGender).map(function(o){ return optionHTML(o, state.concerns.indexOf(o.id)>=0); }).join('')
-    + '</div><p class="cnt" id="cnt"></p>'
+    + '</div>'
+    + '<p class="hint" id="hint" hidden>※ メンズのVIO脱毛は、セラピストによる施術は行っておりません。'
+    + 'セルフ脱毛でのご対応となります（ブースをご用意しています）。</p>'
+    + '<p class="cnt" id="cnt"></p>'
     + '<div class="nav"><button class="back" id="back">←</button>'
     + '<button class="btn" id="next" disabled>次へ進む</button></div>';
 
-  var cnt = document.getElementById('cnt'), next = document.getElementById('next');
+  var cnt  = document.getElementById('cnt'),
+      hint = document.getElementById('hint'),
+      next = document.getElementById('next');
   function sync(){
     cnt.textContent = state.concerns.length ? state.concerns.length + 'つ選択中' : '';
+    // 男性が「セラピスト脱毛」を選んだ時点で、VIOの扱いを明記する
+    hint.hidden = !(state.gender === 'm' && state.concerns.indexOf('thera') >= 0);
     next.disabled = state.concerns.length === 0;
   }
   document.getElementById('opts').addEventListener('click', function(e){
