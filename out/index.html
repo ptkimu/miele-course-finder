@@ -66,7 +66,7 @@
   .back{flex:0 0 auto;width:52px;padding:15px 0;border-radius:99px;border:1.5px solid var(--line);
         background:var(--card);color:var(--sub);font:inherit;font-size:16px;cursor:pointer}
   .cnt{text-align:center;font-size:12px;color:var(--sub);margin-top:10px;min-height:18px}
-  .hint{margin:12px 0 0;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.6;
+  .hint{margin:0 0 14px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.6;
         background:var(--accent-soft);border:1px solid #EED9CF;color:var(--accent-deep);font-weight:600}
   .hint[hidden]{display:none}
 
@@ -174,6 +174,13 @@ var PACES = [
   {id:'monthly',   label:'月1〜2回でコツコツ',       sub:'無理なく続けたい'},
   {id:'quick',     label:'30分以内でサッと',         sub:'仕事帰り・すきま時間に'}
 ];
+
+/* 男性がセラピスト脱毛を選んだときに、質問画面と結果画面の両方で出す注意書き */
+var MENS_VIO_NOTE = '※ メンズのVIO脱毛は、セラピストによる施術は行っておりません。'
+                  + 'セルフ脱毛でのご対応となります（ブースをご用意しています）。';
+function needsMensVioNote(){
+  return state.gender === 'm' && state.concerns.indexOf('thera') >= 0;
+}
 
 /* ---------- コースデータ（HOT PEPPER Beauty 掲載メニューより） ---------- */
 var COURSES = [
@@ -306,6 +313,9 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
    マッチングロジック（条件フィルタリング型）
    お悩み一致 +2 / 予算ぴったり +3・隣の価格帯 +1 / 通い方一致 +3
    ===================================================================== */
+/* 診断結果に出す最大件数 */
+var MAX_RESULTS = 4;
+
 /* price は常に新規（初回）価格。reg があれば 2回目以降の通常価格 */
 function payPrice(c){ return c.price; }
 function tierOf(price){ return price<=5000 ? 1 : price<=10000 ? 2 : price<=15000 ? 3 : 4; }
@@ -351,7 +361,7 @@ function budgetCap(){
 /* ご予算内に候補が無く、価格の近いコースを代わりに出したときだけ true */
 var overBudget = false;
 
-/* ご予算「こだわらない」のときは、同じ価格帯で3枠が埋まらないよう
+/* ご予算「こだわらない」のときは、同じ価格帯だけで枠が埋まらないよう
    価格帯（tier）が重ならないように上位から採り、余った枠をスコア順で埋める。
    お手頃コースだけが並んで90分などのしっかりコースが埋もれるのを防ぐ */
 function pickSpread(list, n){
@@ -365,7 +375,8 @@ function pickSpread(list, n){
   for(i=0;i<list.length && picked.length<n;i++){
     if(picked.indexOf(list[i]) < 0) picked.push(list[i]);
   }
-  return picked;
+  // 表示順は元のランキング順（一致度が高い順）に戻す
+  return picked.sort(function(a,b){ return list.indexOf(a) - list.indexOf(b); });
 }
 
 function getResults(){
@@ -379,7 +390,11 @@ function getResults(){
   // ご予算は上限として扱う。超える金額のコースは出さない
   var within = hit.filter(function(r){ return payPrice(r.course) <= cap; });
   overBudget = false;
-  if(within.length) return state.budget === 'any' ? pickSpread(within,3) : within.slice(0,3);
+  if(within.length){
+    return state.budget === 'any'
+      ? pickSpread(within, MAX_RESULTS)
+      : within.slice(0, MAX_RESULTS);
+  }
 
   // ご予算内に該当が無い場合のみ、条件に合う中で安い順に2件をご案内する
   if(hit.length){
@@ -516,11 +531,11 @@ function renderStep2(){
   main.innerHTML =
       '<h2 class="q">いま気になること・<br>ご希望を教えてください</h2>'
     + '<p class="qs">あてはまるものをすべて選択（複数可）／脱毛は「自分で照射」か「おまかせ」かでお選びください</p>'
+    /* 注意書きは選択肢より上に置く。下に置くと画面下部の固定ナビに隠れて見えない */
+    + '<p class="hint" id="hint" hidden>' + MENS_VIO_NOTE + '</p>'
     + '<div class="opts two" id="opts">'
     + CONCERNS.filter(forGender).map(function(o){ return optionHTML(o, state.concerns.indexOf(o.id)>=0); }).join('')
     + '</div>'
-    + '<p class="hint" id="hint" hidden>※ メンズのVIO脱毛は、セラピストによる施術は行っておりません。'
-    + 'セルフ脱毛でのご対応となります（ブースをご用意しています）。</p>'
     + '<p class="cnt" id="cnt"></p>'
     + '<div class="nav"><button class="back" id="back">←</button>'
     + '<button class="btn" id="next" disabled>次へ進む</button></div>';
@@ -531,7 +546,7 @@ function renderStep2(){
   function sync(){
     cnt.textContent = state.concerns.length ? state.concerns.length + 'つ選択中' : '';
     // 男性が「セラピスト脱毛」を選んだ時点で、VIOの扱いを明記する
-    hint.hidden = !(state.gender === 'm' && state.concerns.indexOf('thera') >= 0);
+    hint.hidden = !needsMensVioNote();
     next.disabled = state.concerns.length === 0;
   }
   document.getElementById('opts').addEventListener('click', function(e){
@@ -552,6 +567,7 @@ function renderStep3(){
   main.innerHTML =
       '<h2 class="q">1回あたりのご予算は<br>どのくらいですか？</h2>'
     + '<p class="qs">表示はすべて税込・新規（初回）価格です</p>'
+    + (needsMensVioNote() ? '<p class="hint">' + MENS_VIO_NOTE + '</p>' : '')
     + '<div class="opts" id="opts">'
     + BUDGETS.map(function(o){ return optionHTML(o, state.budget===o.id); }).join('')
     + '</div><div class="nav"><button class="back" id="back">←</button>'
@@ -590,6 +606,11 @@ var LINE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 
 function renderResult(){
   var results = getResults();
 
+  // 候補にセラピスト脱毛が含まれる男性には、結果画面でもVIOの扱いを明記する
+  var mensVio = state.gender === 'm' && results.some(function(r){
+    return r.course.concerns.indexOf('thera') >= 0;
+  });
+
   var cards = results.map(function(r,i){
     var c = r.course, pay = payPrice(c);
     return '<article class="card' + (i===0?' top':'') + '">'
@@ -621,6 +642,7 @@ function renderResult(){
     + '<dt>お悩み・ご希望</dt><dd>' + state.concerns.map(function(id){ return label(CONCERNS,id); }).join('、') + '</dd>'
     + '<dt>ご予算</dt><dd>' + label(BUDGETS,state.budget) + '</dd>'
     + '<dt>通い方</dt><dd>' + label(PACES,state.pace) + '</dd></dl>'
+    + (mensVio ? '<p class="hint">' + MENS_VIO_NOTE + '</p>' : '')
     + cards
     + '<div class="foot">'
     + '<p>迷ったら、このままご相談ください。<br>選んだ条件をスタッフが確認してお返事します。</p>'
